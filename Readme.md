@@ -1,64 +1,49 @@
 # Bank Legacy Batch
 
-
 ## Desarrollo Backend III - PBY2203
 
+Proyecto desarrollado para la actividad de **Semana 2** de Desarrollo Backend III.
 
-Proyecto desarrollado para la actividad de Semana 1 de Desarrollo Backend III.
-
-
-El objetivo es modernizar tres procesos batch pertenecientes a un sistema legacy del Banco XYZ utilizando Spring Batch, reemplazando el procesamiento tradicional de archivos por un procesamiento estructurado mediante Jobs, Steps, ItemReader, ItemProcessor e ItemWriter.
-
+El objetivo es modernizar tres procesos batch pertenecientes a un sistema legacy del Banco XYZ utilizando **Spring Batch**, incorporando procesamiento concurrente multihilo, políticas personalizadas de tolerancia a fallos y procesamiento por bloques (chunks).
 
 ---
-
 
 ## Objetivo del proyecto
 
-
-Implementar un sistema de migración de procesos batch utilizando Spring Batch capaz de leer información desde archivos CSV, validar y transformar los datos y finalmente almacenarlos en una base de datos MySQL.
-
+Implementar un sistema de migración de procesos batch utilizando Spring Batch capaz de leer información desde archivos CSV, validar y transformar los datos en paralelo, gestionar errores de parseo y formato, y almacenar los resultados en una base de datos MySQL.
 
 El proyecto implementa tres procesos principales:
 
-
-1. Reporte de transacciones diarias.
-2. Cálculo de intereses mensuales.
-3. Generación de estados de cuenta anuales.
-
+1. **Reporte de transacciones diarias:** Detección de anomalías y procesamiento concurrente.
+2. **Cálculo de intereses mensuales:** Cálculo de intereses y actualización de saldos finales por tipo de cuenta.
+3. **Generación de estados de cuenta anuales:** Consolidación de información anual para auditoría.
 
 ---
 
-
 ## Tecnologías utilizadas
 
-
-- Java 17
+- Java 17+
 - Spring Boot 3.5.3
 - Spring Batch 5.2.2
 - Maven
 - MySQL
 - MySQL Workbench
-- Git
-- GitHub
-- CSV
-- JUnit
-
+- Git / GitHub
 
 ---
 
-
 ## Estructura del proyecto
-
 
 ```text
 bank-legacy-batch
 │
 ├── Evidencias
-│   ├── Screenshot 2026-08-17 221120.png
-│   ├── Screenshot 2026-08-17 221149.png
-│   ├── Screenshot 2026-08-17 221403.png
-│   └── Screenshot 2026-08-17 221555.png
+│   ├── Screenshot_Transacciones_Consola.png
+│   ├── Screenshot_Transacciones_DB.png
+│   ├── Screenshot_Intereses_Consola.png
+│   ├── Screenshot_Intereses_DB.png
+│   ├── Screenshot_CuentasAnuales_Consola.png
+│   └── Screenshot_CuentasAnuales_DB.png
 │
 ├── src
 │   ├── main
@@ -80,269 +65,135 @@ bank-legacy-batch
 │   │   │       │   ├── InteresProcessor.java
 │   │   │       │   └── CuentaAnualProcessor.java
 │   │   │       │
+│   │   │       ├── policy
+│   │   │       │   └── CustomSkipPolicy.java
+│   │   │       │
 │   │   │       ├── Exception
 │   │   │       │   └── DatoInvalidoException.java
 │   │   │       │
 │   │   │       └── BankLegacyBatchApplication.java
 │   │   │
 │   │   └── resources
-│   │       ├── Data
-Procesos Batch implementados
-1. Reporte de Transacciones Diarias
+│   │       ├── data
+│   │       │   ├── transacciones.csv
+│   │       │   ├── intereses.csv
+│   │       │   └── cuentas_anuales.csv
+│   │       ├── application.properties
+│   │       └── schema.sql
+```
 
-El Job transaccionesJob procesa el archivo:
+---
 
-src/main/resources/Data/transacciones.csv
+## Procesos Batch Implementados
 
-El proceso utiliza:
+### 1. Reporte de Transacciones Diarias
+* **Job:** `transaccionesJob`
+* **Entrada:** `src/main/resources/data/transacciones.csv`
+* **Salida:** Tabla `transacciones_procesadas`
+* **Lógica:** Valida campos obligatorios, montos negativos y tipos de transacción. Registra observaciones y estados (`PROCESADO` o `PROCESADO_CON_OBSERVACIONES`).
 
-FlatFileItemReader para leer el CSV.
-TransaccionProcessor para validar y transformar los datos.
-JdbcBatchItemWriter para guardar los registros procesados en MySQL.
+### 2. Cálculo de Intereses Mensuales
+* **Job:** `interesesJob`
+* **Entrada:** `src/main/resources/data/intereses.csv`
+* **Salida:** Tabla `intereses_procesados`
+* **Lógica:** Aplica tasas de interés según el tipo de producto (ahorro, préstamo, hipoteca), calcula el interés generado y el saldo final acumulado.
 
-Los registros pueden quedar con estados como:
+### 3. Generación de Estados de Cuenta Anuales
+* **Job:** `cuentasAnualesJob`
+* **Entrada:** `src/main/resources/data/cuentas_anuales.csv`
+* **Salida:** Tabla `cuentas_anuales_procesadas`
+* **Lógica:** Compila movimientos anuales para auditoría y validación contable.
 
-PROCESADO
+---
 
-o:
+## Mejoras de Arquitectura (Semana 2)
 
-PROCESADO_CON_OBSERVACIONES
+### 1. Procesamiento Concurrente (Multithreading)
+Se configuró un `ThreadPoolTaskExecutor` en `BatchConfig.java` con **3 hilos de ejecución paralela**:
+* `corePoolSize`: 3
+* `maxPoolSize`: 3
+* Prefijo de hilos: `Batch-Hilo-`
+* Lectores configurados con `.saveState(false)` para permitir la lectura concurrente thread-safe.
 
-Los resultados son almacenados en:
+### 2. Política de Tolerancia a Fallos (`CustomSkipPolicy`)
+Se implementó una política `SkipPolicy` personalizada para:
+* Capturar y registrar en logs/consola advertencias detalladas de líneas corruptas (`FlatFileParseException`).
+* Permitir saltar hasta 10 registros defectuosos por Job sin abortar la ejecución del lote.
 
-transacciones_procesadas
-2. Cálculo de Intereses Mensuales
+### 3. Procesamiento por Chunks
+Los steps procesan los registros en bloques de **5 elementos** (`.chunk(5)`), optimizando el uso de memoria y transacciones a la base de datos.
 
-El Job interesesJob procesa:
+---
 
-src/main/resources/Data/intereses.csv
+## Configuración y Seguridad de Base de Datos
 
-El proceso:
+El proyecto utiliza **MySQL** (`bank_batch`). Por seguridad, las credenciales no se almacenan en texto plano en el repositorio:
 
-Lee los datos de las cuentas.
-Procesa el tipo de cuenta.
-Calcula el interés correspondiente.
-Calcula el saldo final.
-Guarda el resultado en MySQL.
-
-Los resultados se almacenan en:
-
-intereses_procesados
-
-Los datos generados contienen información como:
-
-Cuenta.
-Nombre.
-Saldo.
-Edad.
-Tipo.
-Interés.
-Saldo final.
-Estado.
-3. Generación de Estados de Cuenta Anuales
-
-El Job cuentasAnualesJob procesa:
-
-src/main/resources/Data/cuentas_anuales.csv
-
-Este proceso permite compilar la información anual de las cuentas para generar información que puede ser utilizada para revisión y auditoría.
-
-Los resultados se almacenan en:
-
-cuentas_anuales_procesadas
-Base de datos
-
-El proyecto utiliza MySQL.
-
-Base de datos:
-
-bank_batch
-
-Configuración utilizada durante el desarrollo:
-
+```properties
 spring.datasource.url=jdbc:mysql://localhost:3306/bank_batch
 spring.datasource.username=root
-spring.datasource.password=1234567
+spring.datasource.password=${DB_PASSWORD}
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
-
-La contraseña utilizada durante el desarrollo local fue:
-
-1234567
-
-Nota de seguridad: esta contraseña corresponde al entorno local utilizado para desarrollar y ejecutar la actividad. En un entorno productivo no se recomienda almacenar contraseñas directamente en application.properties. Se recomienda utilizar variables de entorno o un sistema de gestión de secretos.
-
-Configuración de Spring Batch
-
-Spring Batch utiliza las tablas internas necesarias para registrar la ejecución de los Jobs.
-
-La configuración utilizada es:
 
 spring.batch.jdbc.initialize-schema=always
 spring.sql.init.mode=always
 spring.batch.job.enabled=true
+```
 
-Estas configuraciones permiten inicializar las tablas necesarias para administrar las ejecuciones de Spring Batch.
+---
 
-Manejo de errores
+## Instrucciones de Ejecución
 
-El proyecto contempla el manejo de datos incorrectos mediante:
+### Requisitos previos
+* Java 17 o superior.
+* MySQL Server en ejecución.
+* Maven / Maven Wrapper.
 
-Validaciones en los ItemProcessor.
-Excepciones personalizadas.
-faultTolerant().
-skip(Exception.class).
-skipLimit().
-Estados de procesamiento para identificar registros con observaciones.
-
-Esto permite que un registro con problemas no necesariamente detenga todo el procesamiento batch.
-
-Procesamiento por chunks
-
-Los Steps utilizan procesamiento por bloques mediante chunk.
-
-Ejemplo:
-
-.chunk(10)
-
-Esto permite procesar los registros en grupos, mejorando el rendimiento y permitiendo administrar las transacciones de manera eficiente.
-
-Ejecución del proyecto
-Requisitos
-
-Antes de ejecutar el proyecto se necesita tener instalado:
-
-Java 17 o superior.
-MySQL.
-Maven o utilizar el Maven Wrapper incluido.
-Git.
-1. Crear la base de datos
-
-En MySQL ejecutar:
-
+### 1. Base de Datos
+Crear la base de datos en MySQL:
+```sql
 CREATE DATABASE bank_batch;
+```
 
-Luego seleccionar:
+### 2. Variable de Entorno
+Configurar la variable `DB_PASSWORD` en el IDE o sistema operativo con la contraseña de MySQL local.
 
+### 3. Ejecutar los Jobs
+Configurar la propiedad `spring.batch.job.name` en `application.properties`:
+* **Transacciones:** `spring.batch.job.name=transaccionesJob`
+* **Intereses:** `spring.batch.job.name=interesesJob`
+* **Cuentas Anuales:** `spring.batch.job.name=cuentasAnualesJob`
+
+O mediante línea de comandos:
+```powershell
+# Ejecutar Transacciones
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.batch.job.name=transaccionesJob run.id=1"
+
+# Ejecutar Intereses
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.batch.job.name=interesesJob run.id=2"
+
+# Ejecutar Cuentas Anuales
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.batch.job.name=cuentasAnualesJob run.id=3"
+```
+
+---
+
+## Verificación de Resultados
+
+Consultar las tablas procesadas en MySQL Workbench:
+
+```sql
 USE bank_batch;
-
-El proyecto contiene el archivo:
-
-src/main/resources/schema.sql
-
-que contiene la estructura necesaria para las tablas de resultados.
-
-2. Configurar la conexión
-
-Editar:
-
-src/main/resources/application.properties
-
-y configurar:
-
-spring.datasource.url=jdbc:mysql://localhost:3306/bank_batch
-spring.datasource.username=root
-spring.datasource.password=1234567
-spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
-
-La contraseña debe corresponder a la contraseña configurada para el usuario root de MySQL en el equipo donde se ejecute el proyecto.
-
-3. Ejecutar las pruebas
-
-Desde la carpeta raíz del proyecto:
-
-.\mvnw.cmd clean test
-
-El resultado esperado es:
-
-BUILD SUCCESS
-Ejecución de los Jobs
-
-Para ejecutar nuevamente un Job utilizando un nuevo parámetro de ejecución:
-
-Transacciones
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.batch.job.name=transaccionesJob run.id=10"
-Intereses
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.batch.job.name=interesesJob run.id=11"
-Cuentas anuales
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.batch.job.name=cuentasAnualesJob run.id=12"
-
-El parámetro run.id permite realizar nuevas ejecuciones del Job sin reutilizar exactamente la misma instancia de ejecución registrada por Spring Batch.
-
-Verificación de resultados
-
-Los resultados pueden comprobarse desde MySQL Workbench:
-
-USE bank_batch;
-
 
 SELECT * FROM transacciones_procesadas;
-
-
 SELECT * FROM intereses_procesados;
-
-
 SELECT * FROM cuentas_anuales_procesadas;
+```
+---
 
-También se pueden obtener los totales:
+## Autoría
 
-SELECT COUNT(*) AS total_transacciones
-FROM transacciones_procesadas;
-
-
-SELECT COUNT(*) AS total_intereses
-FROM intereses_procesados;
-
-
-SELECT COUNT(*) AS total_cuentas_anuales
-FROM cuentas_anuales_procesadas;
-Evidencias de ejecución
-
-La carpeta Evidencias contiene capturas de pantalla que muestran:
-
-Ejecución de los Jobs.
-Procesamiento de los registros.
-Resultados almacenados en MySQL.
-Información generada por los procesos batch.
-Resultado
-
-Los tres procesos fueron implementados utilizando Spring Batch:
-
-Proceso	Job	Entrada	Salida
-Transacciones diarias	transaccionesJob	transacciones.csv	transacciones_procesadas
-Intereses mensuales	interesesJob	intereses.csv	intereses_procesados
-Estados de cuenta anuales	cuentasAnualesJob	cuentas_anuales.csv	cuentas_anuales_procesadas
-
-El proyecto permite modernizar los procesos batch del sistema legacy mediante una arquitectura basada en lectura, procesamiento y escritura de datos utilizando Spring Batch.
-
-Autor
-
-Kevin
-
-Desarrollo Backend III - PBY2203
-
-DUOC UC
-
-Repositorio
-
-Proyecto disponible en GitHub:
-
-https://github.com/Kevinlovera/bank-legacy-batch
-
-
-
-### Después de reemplazar el README
-
-
-En PowerShell, dentro de tu proyecto, ejecuta:
-
-
-```powershell
-git add Readme.md
-
-Luego:
-
-git commit -m "Actualizar README con documentacion del proyecto"
-
-Y finalmente:
-
-git push
+* **Alexander Diaz y Kevin Lovera**
+* **Asignatura:** Desarrollo Backend III - PBY2203
+* **Institución:** DUOC UC
+* **Repositorio GitHub:** `https://github.com/Kevinlovera/bank-legacy-batch`

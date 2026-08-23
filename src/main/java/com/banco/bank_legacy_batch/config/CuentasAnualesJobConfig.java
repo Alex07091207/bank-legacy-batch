@@ -1,10 +1,12 @@
 package com.banco.bank_legacy_batch.config;
 
 import com.banco.bank_legacy_batch.model.CuentaAnual;
+import com.banco.bank_legacy_batch.policy.CustomSkipPolicy;
 import com.banco.bank_legacy_batch.processor.CuentaAnualProcessor;
 
 import javax.sql.DataSource;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import org.springframework.batch.core.Job;
@@ -23,110 +25,109 @@ import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
-
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
 public class CuentasAnualesJobConfig {
 
-    @Bean
-    public FlatFileItemReader<CuentaAnual> cuentaAnualReader() {
-
+@Bean
+public FlatFileItemReader<CuentaAnual> cuentasAnualesReader() {
         return new FlatFileItemReaderBuilder<CuentaAnual>()
-                .name("cuentaAnualReader")
-                .resource(
-                        new ClassPathResource(
-                                "data/cuentas_anuales.csv"))
+                .name("cuentasAnualesReader")
+                .resource(new ClassPathResource("data/cuentas_anuales.csv"))
                 .linesToSkip(1)
                 .delimited()
                 .delimiter(",")
-                .names(
-                        "id",
-                        "fecha",
-                        "monto",
-                        "tipo")
+                // Leemos las 5 columnas exactas del CSV
+                .names("cuenta_id", "fecha", "tipo", "monto", "descripcion")
+                .saveState(false)
                 .fieldSetMapper(fieldSet -> {
-
-                    CuentaAnual item = new CuentaAnual();
-
-                    item.setId(
-                            fieldSet.readLong("id"));
-
-                    item.setFecha(
-                            LocalDate.parse(
-                                    fieldSet.readString("fecha")));
-
-                    item.setMonto(
-                            fieldSet.readBigDecimal("monto"));
-
-                    item.setTipo(
-                            fieldSet.readString("tipo"));
-
-                    return item;
+                CuentaAnual item = new CuentaAnual();
+                
+                    // Limpiamos la fecha por si viene con slashes (ej: 2024/10/01)
+                String fechaStr = fieldSet.readString("fecha");
+                if(fechaStr != null && fechaStr.contains("/")) {
+                        fechaStr = fechaStr.replace("/", "-");
+                }
+                item.setFecha(LocalDate.parse(fechaStr));
+                
+                    // Asignamos el monto
+                String montoStr = fieldSet.readString("monto");
+                if (montoStr != null && !montoStr.trim().isEmpty()) {
+                        item.setMonto(new BigDecimal(montoStr));
+                }
+                
+                item.setTipo(fieldSet.readString("tipo"));
+                return item;
                 })
                 .build();
-    }
+}
 
-    @Bean
-    public CuentaAnualProcessor cuentaAnualProcessor() {
+@Bean
+public CuentaAnualProcessor cuentaAnualProcessor() {
         return new CuentaAnualProcessor();
-    }
+}
 
-    @Bean
-    public JdbcBatchItemWriter<CuentaAnual> cuentaAnualWriter(
-            DataSource dataSource) {
+@Bean
+public JdbcBatchItemWriter<CuentaAnual> cuentaAnualWriter(
+        DataSource dataSource) {
 
         return new JdbcBatchItemWriterBuilder<CuentaAnual>()
                 .dataSource(dataSource)
                 .sql("""
-                    INSERT INTO cuentas_anuales_procesadas
-                    (
+                INSERT INTO cuentas_anuales_procesadas
+                (
                         id,
                         fecha,
                         monto,
                         tipo,
                         estado
-                    )
-                    VALUES
-                    (
+                )
+                VALUES
+                (
                         :id,
                         :fecha,
                         :monto,
                         :tipo,
                         :estado
-                    )
-                    """)
+                )
+                """)
                 .beanMapped()
                 .build();
-    }
+}
 
-    @Bean
-    public Step cuentasAnualesStep(
-            JobRepository jobRepository,
-            PlatformTransactionManager transactionManager,
-            FlatFileItemReader<CuentaAnual> cuentaAnualReader,
-            CuentaAnualProcessor cuentaAnualProcessor,
-            JdbcBatchItemWriter<CuentaAnual> cuentaAnualWriter) {
+@Bean
+public Step cuentasAnualesStep(
+        JobRepository jobRepository,
+        PlatformTransactionManager transactionManager,
+        FlatFileItemReader<CuentaAnual> cuentaAnualReader,
+        CuentaAnualProcessor cuentaAnualProcessor,
+        JdbcBatchItemWriter<CuentaAnual> cuentaAnualWriter,
+        TaskExecutor taskExecutor,         
+        CustomSkipPolicy customSkipPolicy  
+        ) {
 
         return new StepBuilder(
                 "cuentasAnualesStep",
                 jobRepository)
                 .<CuentaAnual, CuentaAnual>chunk(
-                        10,
+                        5,                 
                         transactionManager)
                 .reader(cuentaAnualReader)
                 .processor(cuentaAnualProcessor)
                 .writer(cuentaAnualWriter)
+                
+                .taskExecutor(taskExecutor)    
                 .faultTolerant()
-                .skip(Exception.class)
-                .skipLimit(10)
+                .skipPolicy(customSkipPolicy) 
                 .build();
-    }
+}
 
-    @Bean
-    public Job cuentasAnualesJob(
-            JobRepository jobRepository,
-            Step cuentasAnualesStep) {
+@Bean
+public Job cuentasAnualesJob(
+        JobRepository jobRepository,
+        Step cuentasAnualesStep) {
 
         return new JobBuilder(
                 "cuentasAnualesJob",
@@ -134,5 +135,5 @@ public class CuentasAnualesJobConfig {
                 .incrementer(new RunIdIncrementer())
                 .start(cuentasAnualesStep)
                 .build();
-    }
+}
 }

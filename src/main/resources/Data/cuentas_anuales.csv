@@ -1,11 +1,10 @@
-id,fecha,monto,tipo
-1,2024-01-01,1000,debito
-2,2024-01-02,1500,credito
-3,2024-01-03,-200,debito
-4,2024-01-03,0,debito
-5,2024-01-04,800,credito
-6,2024-01-05,700,debito
-7,2024-01-06,1200,credito
-8,2024-01-05,700,debito
-9,2024-01-07,3000,debito
-10,2024-01-08,1000,credito
+cuenta_id,fecha,transaccion,monto,descripcion
+101,2024-01-01,deposito,1000,Ingreso mensual
+101,2024-03-15,retiro,-500,Retiro parcial  
+102,2024-05-22,deposito,1500,Ingreso mensual
+103,2024-07-10,deposito,2000,              
+104,2024-09-05,compra,-100,Compra en tienda 
+105,2024/10/01,deposito,2500,Ingreso extra  
+106,2024-11-20,deposito,3000,Ingreso mensual
+107,2024-12-25,deposito,0,Ingreso navideño  
+108,2024-12-31,deposito,2000,Ingreso de fin de año
