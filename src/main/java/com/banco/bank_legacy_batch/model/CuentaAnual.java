@@ -17,6 +17,7 @@ import lombok.ToString;
 public class CuentaAnual {
 
     private Long id;
+    private Long cuentaId;
     private LocalDate fecha;
     private BigDecimal monto;
     private String tipo;

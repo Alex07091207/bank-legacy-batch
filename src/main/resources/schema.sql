@@ -26,6 +26,7 @@ CREATE TABLE intereses_procesados (
 
 CREATE TABLE cuentas_anuales_procesadas (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    cuenta_id BIGINT NOT NULL, 
     fecha DATE,
     monto DECIMAL(15,2),
     tipo VARCHAR(50),

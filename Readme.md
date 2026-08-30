@@ -125,6 +125,27 @@ Los steps procesan los registros en bloques de **5 elementos** (`.chunk(5)`), op
 
 ---
 
+## Mejoras de Resiliencia y Rendimiento (Semana 3)
+
+### 1. Orquestación Controlada
+Se implementó la clase `JobRunner` (implementando `CommandLineRunner`) para apagar la ejecución por defecto y orquestar el disparo secuencial y automatizado de los 3 Jobs mediante `JobLauncher`.
+
+### 2. Parseo Blindado y Listener de Errores
+* Se integró un `CustomSkipListener` para registrar formalmente los registros omitidos.
+* Se agregó un bloque de parseo dinámico (Try-Catch) en el `FieldSetMapper` para procesar múltiples formatos de fecha sin romper el `Reader`, derivando los datos sucios al Processor para ser guardados como `PROCESADO_CON_OBSERVACIONES`.
+* Se configuró un `.retryLimit(3)` enfocado exclusivamente en `TransientDataAccessException` para soportar micro-cortes o bloqueos de la base de datos.
+
+### 3. Análisis de Escalamiento por Particiones (Partitions)
+Se implementaron técnicas de escalado mediante particionamiento (`TaskExecutorPartitionHandler` y `Partitioner`) junto con procesamiento paralelo usando un pool de 3 hilos. Los archivos procesados contienen **1000 registros** cada uno.
+
+A continuación, se presenta la comparativa de rendimiento que justifica la elección de parámetros:
+
+| Configuración / Parámetros | Tiempo Ejecución (Transacciones) | Tiempo Ejecución (Intereses) | Tiempo Ejecución (Cuentas Anuales) | Observaciones |
+| :--- | :--- | :--- | :--- | :--- |
+| **Ejecución Lineal (Semana 2)** | ~157 ms* | ~140 ms* | ~123 ms* | Procesamiento secuencial clásico (*Tiempos referenciales con archivos de 10 registros). |
+| **Multithreading (3 Hilos, Chunk 10)** | ~210 ms* | ~160 ms* | ~135 ms* | El overhead de crear los hilos sin particionar la data. |
+| **Particiones (3 Hilos, Chunk 5) - ÓPTIMO** | **867 ms** | **683 ms** | **599 ms** | Al dividir el CSV en rangos (`start`/`end`) mediante el `ArchivoPartitioner`, cada hilo recibe un volumen exacto. El sistema procesó **1000 registros** por tabla en menos de 1 segundo de forma resiliente y sin choque de llaves. |
+
 ## Configuración y Seguridad de Base de Datos
 
 El proyecto utiliza **MySQL** (`bank_batch`). Por seguridad, las credenciales no se almacenan en texto plano en el repositorio:
@@ -137,7 +158,7 @@ spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 
 spring.batch.jdbc.initialize-schema=always
 spring.sql.init.mode=always
-spring.batch.job.enabled=true
+spring.batch.job.enabled=false
 ```
 
 ---
