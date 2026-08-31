@@ -180,21 +180,9 @@ CREATE DATABASE bank_batch;
 Configurar la variable `DB_PASSWORD` en el IDE o sistema operativo con la contraseña de MySQL local.
 
 ### 3. Ejecutar los Jobs
-Configurar la propiedad `spring.batch.job.name` en `application.properties`:
-* **Transacciones:** `spring.batch.job.name=transaccionesJob`
-* **Intereses:** `spring.batch.job.name=interesesJob`
-* **Cuentas Anuales:** `spring.batch.job.name=cuentasAnualesJob`
-
-O mediante línea de comandos:
+Mediante línea de comandos:
 ```powershell
-# Ejecutar Transacciones
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.batch.job.name=transaccionesJob run.id=1"
-
-# Ejecutar Intereses
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.batch.job.name=interesesJob run.id=2"
-
-# Ejecutar Cuentas Anuales
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.batch.job.name=cuentasAnualesJob run.id=3"
+.\mvnw.cmd spring-boot:run
 ```
 
 ---
@@ -214,7 +202,7 @@ SELECT * FROM cuentas_anuales_procesadas;
 
 ## Autoría
 
-* **Alexander Diaz y Kevin Lovera**
+* **Alexander Diaz**
 * **Asignatura:** Desarrollo Backend III - PBY2203
 * **Institución:** DUOC UC
-* **Repositorio GitHub:** `https://github.com/Kevinlovera/bank-legacy-batch`
+* **Repositorio GitHub:** `https://github.com/Alex07091207/bank-legacy-batch.git`
