@@ -1,0 +1,38 @@
+server:
+  port: 8443
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: password123
+    key-store-type: PKCS12
+    key-alias: bff-bank
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/bank_batch
+    username: root
+    password: liliyasir1207#
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    open-in-view: false
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+  sql:
+    init:
+      mode: never
+
+# Configuraciones de tolerancia a fallos (Circuit Breaker)
+resilience4j:
+  circuitbreaker:
+    instances:
+      bankServiceCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000ms
+        permittedNumberOfCallsInHalfOpenState: 3

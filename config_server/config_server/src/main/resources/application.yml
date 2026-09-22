@@ -1,0 +1,13 @@
+server:
+  port: 8888  # El puerto por defecto del config server
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native  # Le dice al servidor que lea archivos de una carpeta local
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config  # Buscará en la carpeta 'config' de este proyecto
