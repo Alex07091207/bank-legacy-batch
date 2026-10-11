@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -45,7 +46,7 @@ public class CuentasAnualesJobConfig {
 
         return new FlatFileItemReaderBuilder<CuentaAnual>()
                 .name("cuentasAnualesReader")
-                .resource(new ClassPathResource("data/cuentas_anuales.csv"))
+                .resource(new FileSystemResource("src/main/resources/data/cuentas_anuales.csv"))
                 .linesToSkip(linesToSkip)
                 .maxItemCount(maxCount)
                 .delimited()

@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -41,11 +42,11 @@ public FlatFileItemReader<Transaccion> transaccionesReader(
 
         int linesToSkip = 1; 
         if (start != null) linesToSkip = 1 + start;
-        int maxCount = (partitionSize != null) ? partitionSize : 1000; // <--- AHORA LEE 1000
+        int maxCount = (partitionSize != null) ? partitionSize : 1000; 
 
         return new FlatFileItemReaderBuilder<Transaccion>()
                 .name("transaccionesReader")
-                .resource(new ClassPathResource("data/transacciones.csv"))
+                .resource(new FileSystemResource("src/main/resources/data/transacciones.csv"))
                 .linesToSkip(linesToSkip)
                 .maxItemCount(maxCount)
                 .delimited()

@@ -25,7 +25,7 @@ public class AtmBffService {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    @CircuitBreaker(name = "bankServiceCB", fallbackMethod = "metodoDeRespaldo")
+    @CircuitBreaker(name = "bankServiceCB", fallbackMethod = "metodoDeRespaldoSaldo") 
     public AtmSaldoResponse consultarSaldo(Long cuentaId) {
         Interes cuenta = cuentaBffRepository.buscarCuenta(cuentaId)
                 .orElseThrow(() -> new RuntimeException("Cuenta no encontrada: " + cuentaId));
@@ -56,6 +56,9 @@ public class AtmBffService {
 
         // Enviar mensaje asíncrono a Kafka
         String mensajeEvento = "Retiro de " + request.getMonto() + " procesado exitosamente para la cuenta " + cuentaId;
+        kafkaTemplate.send("transacciones-topic", mensajeEvento);
+
+        System.out.println("=== [KAFKA PRODUCER] Publicando evento de retiro en el tópico ===");
         kafkaTemplate.send("transacciones-topic", mensajeEvento);
 
         return new AtmRetiroResponse(cuentaId, request.getMonto(), nuevoSaldo, "EXITOSO", "Retiro realizado con exito.");
